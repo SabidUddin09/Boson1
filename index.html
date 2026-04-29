@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Boson Task Management</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            cyan: {
+              50: '#ecfeff',
+              100: '#cffafe',
+              200: '#a5f3fc',
+              300: '#67e8f9',
+              400: '#22d3ee',
+              500: '#06b6d4',
+              600: '#0891b2',
+              700: '#0e7490',
+              800: '#155e75',
+              900: '#164e63',
+              950: '#083344',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #06b6d4; border-radius: 3px; }
+    .kanban-col { min-height: 200px; }
+    .task-card { transition: all 0.2s ease; }
+    .task-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(6, 182, 212, 0.15); }
+    .nav-item { transition: all 0.2s ease; }
+    .nav-item:hover { background: rgba(6, 182, 212, 0.1); }
+    .nav-item.active { background: rgba(6, 182, 212, 0.15); border-right: 3px solid #06b6d4; }
+    .stat-card { transition: all 0.3s ease; }
+    .stat-card:hover { transform: translateY(-4px); box-shadow: 0 12px 30px rgba(6, 182, 212, 0.2); }
+    .dept-badge { transition: all 0.2s ease; }
+    .dept-badge:hover { transform: scale(1.05); }
+    .modal-overlay { backdrop-filter: blur(4px); }
+    .pulse-dot { animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .fade-in { animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .sidebar-collapse { transition: width 0.3s ease; }
+    .glow-border { box-shadow: 0 0 0 1px rgba(6, 182, 212, 0.3), 0 0 15px rgba(6, 182, 212, 0.1); }
+    .progress-bar { transition: width 0.5s ease; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen flex">
+
+  <!-- Auth Overlay -->
+  <div id="authOverlay" class="fixed inset-0 z-50 bg-gradient-to-br from-cyan-50 via-white to-cyan-50 flex items-center justify-center">
+    <div class="w-full max-w-md mx-4">
+      <div class="text-center mb-8">
+        <div class="w-16 h-16 bg-gradient-to-br from-cyan-400 to-cyan-600 rounded-2xl flex items-center justify-center shadow-xl shadow-cyan-200 mx-auto mb-4">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+        </div>
+        <h1 class="text-2xl font-bold text-gray-900">Boson Task Manager</h1>
+        <p class="text-sm text-gray-400 mt-1">Science Communication Task Platform</p>
+      </div>
+      <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+        <div class="flex border-b border-gray-100">
+          <button onclick="switchAuthTab('login')" id="authTabLogin" class="flex-1 py-3.5 text-sm font-semibold text-cyan-600 border-b-2 border-cyan-500 bg-cyan-50/50 transition">Sign In</button>
+          <button onclick="switchAuthTab('register')" id="authTabRegister" class="flex-1 py-3.5 text-sm font-semibold text-gray-400 border-b-2 border-transparent transition">Register</button>
+        </div>
+        <!-- Login Form -->
+        <div id="authLoginForm" class="p-6">
+          <form onsubmit="handleLogin(event)" class="space-y-4">
+            <div>
+              <label class="text-sm font-semibold text-gray-700 mb-1 block">Email</label>
+              <input id="loginEmail" type="email" required placeholder="your@email.com" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition">
+            </div>
+            <div>
+              <label class="text-sm font-semibold text-gray-700 mb-1 block">Password</label>
+              <input id="loginPassword" type="password" required placeholder="••••••••" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition">
+            </div>
+            <div id="loginError" class="hidden text-sm text-rose-600 bg-rose-50 p-3 rounded-xl"></div>
+            <button type="submit" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-cyan-600 text-white text-sm font-semibold shadow-lg shadow-cyan-200 hover:from-cyan-600 hover:to-cyan-700 transition-all">Sign In</button>
+          </form>
+        </div>
+        <!-- Register Form -->
+        <div id="authRegisterForm" class="p-6 hidden">
+          <form onsubmit="handleRegister(event)" class="space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="text-sm font-semibold text-gray-700 mb-1 block">First Name</label>
+                <input id="regFirstName" type="text" required placeholder="Jane" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition">
+              </div>
+              <div>
+                <label class="text-sm font-semibold text-gray-700 mb-1 block">Last Name</label>
+                <input id="regLastName" type="text" required placeholder="Doe" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition">
+              </div>
+            </div>
+            <div>
+              <label class="text-sm font-semibold text-gray-700 mb-1 block">Email</label>
+              <input id="regEmail" type="email" required placeholder="your@email.com" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition">
+            </div>
+            <div>
+              <label class="text-sm font-semibold text-gray-700 mb-1 block">Password</label>
+              <input id="regPassword" type="password" required minlength="6" placeholder="Min 6 characters" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="text-sm font-semibold text-gray-700 mb-1 block">Department</label>
+                <select id="regDept" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none bg-white transition">
+                  <option value="technical">Technical</option>
+                  <option value="content">Content</option>
+                  <option value="design">Design</option>
+                  <option value="events">Events</option>
+                  <option value="research">Research</option>
+                  <option value="outreach">Outreach</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-sm font-semibold text-gray-700 mb-1 block">Role</label>
+                <input id="regRole" type="text" required placeholder="e.g. Science Writer" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition">
+              </div>
+            </div>
+            <div id="registerError" class="hidden text-sm text-rose-600 bg-rose-50 p-3 rounded-xl"></div>
+            <button type="submit" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-cyan-600 text-white text-sm font-semibold shadow-lg shadow-cyan-200 hover:from-cyan-600 hover:to-cyan-700 transition-all">Create Account</button>
+          </form>
+        </div>
+      </div>
+      <div class="mt-6 bg-white/60 rounded-xl p-4 border border-cyan-100">
+        <p class="text-xs text-cyan-700 font-semibold mb-2">Demo Accounts</p>
+        <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-gray-500">
+          <span>sarah@boson.org</span><span class="text-gray-400">password</span>
+          <span>marcus@boson.org</span><span class="text-gray-400">password</span>
+          <span>aisha@boson.org</span><span class="text-gray-400">password</span>
+          <span>luna@boson.org</span><span class="text-gray-400">password</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <aside id="sidebar" class="sidebar-collapse w-64 bg-white border-r border-gray-200 flex flex-col fixed h-full z-30 shadow-sm">
+    <!-- Logo -->
+    <div class="p-5 border-b border-gray-100">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-gradient-to-br from-cyan-400 to-cyan-600 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-200">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-gray-900">Boson</h1>
+          <p class="text-[10px] text-cyan-600 font-semibold tracking-widest uppercase">Task Manager</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="flex-1 py-4 overflow-y-auto">
+      <p class="px-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Main</p>
+      <button onclick="switchView('dashboard')" data-nav="dashboard" class="nav-item active w-full flex items-center gap-3 px-5 py-2.5 text-sm text-gray-700">
+        <i data-lucide="layout-dashboard" class="w-[18px] h-[18px] text-cyan-600"></i>
+        <span>Dashboard</span>
+      </button>
+      <button onclick="switchView('kanban')" data-nav="kanban" class="nav-item w-full flex items-center gap-3 px-5 py-2.5 text-sm text-gray-700">
+        <i data-lucide="columns-3" class="w-[18px] h-[18px] text-cyan-600"></i>
+        <span>Kanban Board</span>
+      </button>
+      <button onclick="switchView('tasks')" data-nav="tasks" class="nav-item w-full flex items-center gap-3 px-5 py-2.5 text-sm text-gray-700">
+        <i data-lucide="list-checks" class="w-[18px] h-[18px] text-cyan-600"></i>
+        <span>All Tasks</span>
+      </button>
+      <button onclick="switchView('team')" data-nav="team" class="nav-item w-full flex items-center gap-3 px-5 py-2.5 text-sm text-gray-700">
+        <i data-lucide="users" class="w-[18px] h-[18px] text-cyan-600"></i>
+        <span>Team</span>
+      </button>
+      <button onclick="switchView('profile')" data-nav="profile" class="nav-item w-full flex items-center gap-3 px-5 py-2.5 text-sm text-gray-700">
+        <i data-lucide="user-circle" class="w-[18px] h-[18px] text-cyan-600"></i>
+        <span>My Profile</span>
+      </button>
+
+      <p class="px-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 mt-6">Departments</p>
+      <button onclick="filterDept('all')" data-dept="all" class="nav-item dept-nav active w-full flex items-center gap-3 px-5 py-2.5 text-sm text-gray-700">
+        <span class="w-2.5 h-2.5 rounded-full bg-gradient-to-r from-cyan-400 to-cyan-600"></span>
+        <span>All Departments</span>
+      </button>
+      <button onclick="filterDept('technical')" data-dept="technical" class="nav-item dept-nav w-full flex items-center gap-3 px-5 py-2.5 text-sm text-gray-700">
+        <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+        <span>Technical</span>
+      </button>
+      <button onclick="filterDept('content')" data-dept="content" class="nav-item dept-nav w-full flex items-center gap-3 px-5 py-2.5 text-sm text-gray-700">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+        <span>Content</span>
+      </button>
+      <button onclick="filterDept('design')" data-dept="design" class="nav-item dept-nav w-full flex items-center gap-3 px-5 py-2.5 text-sm text-gray-700">
+        <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
+        <span>Design</span>
+      </button>
+      <button onclick="filterDept('events')" data-dept="events" class="nav-item dept-nav w-full flex items-center gap-3 px-5 py-2.5 text-sm text-gray-700">
+        <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+        <span>Events</span>
+      </button>
+      <button onclick="filterDept('research')" data-dept="research" class="nav-item dept-nav w-full flex items-center gap-3 px-5 py-2.5 text-sm text-gray-700">
+        <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+        <span>Research</span>
+      </button>
+      <button onclick="filterDept('outreach')" data-dept="outreach" class="nav-item dept-nav w-full flex items-center gap-3 px-5 py-2.5 text-sm text-gray-700">
+        <span class="w-2.5 h-2.5 rounded-full bg-cyan-500"></span>
+        <span>Outreach</span>
+      </button>
+    </nav>
+
+    <!-- User -->
+    <div class="p-4 border-t border-gray-100">
+      <div class="flex items-center gap-3">
+        <div id="sidebarAvatar" class="w-9 h-9 rounded-full bg-gradient-to-br from-cyan-400 to-cyan-600 flex items-center justify-center text-white text-sm font-bold">?</div>
+        <div class="flex-1 min-w-0">
+          <p id="sidebarUserName" class="text-sm font-semibold text-gray-900 truncate">Loading...</p>
+          <p id="sidebarUserRole" class="text-[11px] text-gray-400">—</p>
+        </div>
+        <button onclick="handleLogout()" class="p-1 hover:bg-gray-100 rounded-lg transition" title="Log out">
+          <i data-lucide="log-out" class="w-4 h-4 text-gray-400 hover:text-rose-500 transition"></i>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Mobile sidebar toggle -->
+  <button id="mobileToggle" onclick="toggleSidebar()" class="lg:hidden fixed top-4 left-4 z-40 bg-white p-2 rounded-xl shadow-lg border border-gray-200">
+    <i data-lucide="menu" class="w-5 h-5 text-cyan-600"></i>
+  </button>
+
+  <!-- Main Content -->
+  <main class="flex-1 ml-0 lg:ml-64 min-h-screen">
+    <!-- Top Bar -->
+    <header class="sticky top-0 bg-white/80 backdrop-blur-lg border-b border-gray-100 z-20">
+      <div class="flex items-center justify-between px-4 lg:px-8 py-4">
+        <div class="flex items-center gap-4 ml-12 lg:ml-0">
+          <div>
+            <h2 id="pageTitle" class="text-xl font-bold text-gray-900">Dashboard</h2>
+            <p id="pageSubtitle" class="text-xs text-gray-400">Overview of all tasks and departments</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="hidden sm:flex items-center bg-gray-100 rounded-xl px-3 py-2 gap-2">
+            <i data-lucide="search" class="w-4 h-4 text-gray-400"></i>
+            <input id="searchInput" oninput="handleSearch(this.value)" type="text" placeholder="Search tasks..." class="bg-transparent text-sm outline-none w-40 text-gray-700 placeholder-gray-400">
+          </div>
+          <button onclick="openModal()" class="flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-lg shadow-cyan-200 transition-all">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            <span class="hidden sm:inline">New Task</span>
+          </button>
+          <div class="relative">
+            <button class="p-2 rounded-xl hover:bg-gray-100 transition relative">
+              <i data-lucide="bell" class="w-5 h-5 text-gray-500"></i>
+              <span class="absolute top-1 right-1 w-2 h-2 bg-cyan-500 rounded-full pulse-dot"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Dashboard View -->
+    <div id="view-dashboard" class="view-content p-4 lg:p-8 fade-in">
+      <!-- Stats Row -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div class="stat-card bg-white rounded-2xl p-5 border border-gray-100 glow-border">
+          <div class="flex items-center justify-between mb-3">
+            <div class="w-10 h-10 bg-cyan-50 rounded-xl flex items-center justify-center">
+              <i data-lucide="list-checks" class="w-5 h-5 text-cyan-600"></i>
+            </div>
+            <span class="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">+12%</span>
+          </div>
+          <p id="statTotal" class="text-2xl font-bold text-gray-900">0</p>
+          <p class="text-xs text-gray-400 mt-1">Total Tasks</p>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-5 border border-gray-100">
+          <div class="flex items-center justify-between mb-3">
+            <div class="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+              <i data-lucide="clock" class="w-5 h-5 text-blue-600"></i>
+            </div>
+            <span class="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">Active</span>
+          </div>
+          <p id="statProgress" class="text-2xl font-bold text-gray-900">0</p>
+          <p class="text-xs text-gray-400 mt-1">In Progress</p>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-5 border border-gray-100">
+          <div class="flex items-center justify-between mb-3">
+            <div class="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
+              <i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-600"></i>
+            </div>
+            <span class="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Done</span>
+          </div>
+          <p id="statDone" class="text-2xl font-bold text-gray-900">0</p>
+          <p class="text-xs text-gray-400 mt-1">Completed</p>
+        </div>
+        <div class="stat-card bg-white rounded-2xl p-5 border border-gray-100">
+          <div class="flex items-center justify-between mb-3">
+            <div class="w-10 h-10 bg-rose-50 rounded-xl flex items-center justify-center">
+              <i data-lucide="alert-triangle" class="w-5 h-5 text-rose-600"></i>
+            </div>
+            <span class="text-[11px] font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full">Urgent</span>
+          </div>
+          <p id="statUrgent" class="text-2xl font-bold text-gray-900">0</p>
+          <p class="text-xs text-gray-400 mt-1">High Priority</p>
+        </div>
+      </div>
+
+      <!-- Department Progress + Recent Activity -->
+      <div class="grid lg:grid-cols-3 gap-6 mb-8">
+        <!-- Department Progress -->
+        <div class="lg:col-span-2 bg-white rounded-2xl border border-gray-100 p-6">
+          <div class="flex items-center justify-between mb-6">
+            <h3 class="font-bold text-gray-900">Department Progress</h3>
+            <span class="text-xs text-gray-400">This week</span>
+          </div>
+          <div id="deptProgress" class="space-y-4"></div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="bg-white rounded-2xl border border-gray-100 p-6">
+          <div class="flex items-center justify-between mb-6">
+            <h3 class="font-bold text-gray-900">Recent Activity</h3>
+            <i data-lucide="activity" class="w-4 h-4 text-cyan-500"></i>
+          </div>
+          <div id="recentActivity" class="space-y-4"></div>
+        </div>
+      </div>
+
+      <!-- Recent Tasks -->
+      <div class="bg-white rounded-2xl border border-gray-100 p-6">
+        <div class="flex items-center justify-between mb-6">
+          <h3 class="font-bold text-gray-900">Recent Tasks</h3>
+          <button onclick="switchView('tasks')" class="text-xs text-cyan-600 hover:text-cyan-700 font-semibold transition">View All →</button>
+        </div>
+        <div id="recentTasks" class="space-y-3"></div>
+      </div>
+    </div>
+
+    <!-- Kanban View -->
+    <div id="view-kanban" class="view-content p-4 lg:p-8 hidden fade-in">
+      <div class="flex gap-4 overflow-x-auto pb-4" id="kanbanBoard">
+        <!-- Columns generated by JS -->
+      </div>
+    </div>
+
+    <!-- Tasks List View -->
+    <div id="view-tasks" class="view-content p-4 lg:p-8 hidden fade-in">
+      <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <!-- Filters -->
+        <div class="p-4 border-b border-gray-100 flex flex-wrap gap-2">
+          <button onclick="filterTasksByStatus('all')" data-tfilter="all" class="task-filter px-3 py-1.5 text-xs font-semibold rounded-lg bg-cyan-50 text-cyan-700 transition">All</button>
+          <button onclick="filterTasksByStatus('todo')" data-tfilter="todo" class="task-filter px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 text-gray-600 hover:bg-cyan-50 hover:text-cyan-700 transition">To Do</button>
+          <button onclick="filterTasksByStatus('progress')" data-tfilter="progress" class="task-filter px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 text-gray-600 hover:bg-cyan-50 hover:text-cyan-700 transition">In Progress</button>
+          <button onclick="filterTasksByStatus('review')" data-tfilter="review" class="task-filter px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 text-gray-600 hover:bg-cyan-50 hover:text-cyan-700 transition">Review</button>
+          <button onclick="filterTasksByStatus('done')" data-tfilter="done" class="task-filter px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 text-gray-600 hover:bg-cyan-50 hover:text-cyan-700 transition">Done</button>
+        </div>
+        <!-- Task List -->
+        <div id="taskList" class="divide-y divide-gray-50"></div>
+      </div>
+    </div>
+
+    <!-- Team View -->
+    <div id="view-team" class="view-content p-4 lg:p-8 hidden fade-in">
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4" id="teamGrid"></div>
+    </div>
+
+    <!-- Profile View -->
+    <div id="view-profile" class="view-content p-4 lg:p-8 hidden fade-in">
+      <div id="profileContent"></div>
+    </div>
+  </main>
+
+  <!-- New Task Modal -->
+  <div id="taskModal" class="fixed inset-0 z-50 hidden items-center justify-center modal-overlay bg-black/30">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto fade-in">
+      <div class="p-6 border-b border-gray-100 flex items-center justify-between">
+        <h3 class="text-lg font-bold text-gray-900">Create New Task</h3>
+        <button onclick="closeModal()" class="p-1 hover:bg-gray-100 rounded-lg transition">
+          <i data-lucide="x" class="w-5 h-5 text-gray-500"></i>
+        </button>
+      </div>
+      <form onsubmit="createTask(event)" class="p-6 space-y-4">
+        <div>
+          <label class="text-sm font-semibold text-gray-700 mb-1 block">Task Title</label>
+          <input id="taskTitle" type="text" required placeholder="Enter task title..." class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition">
+        </div>
+        <div>
+          <label class="text-sm font-semibold text-gray-700 mb-1 block">Description</label>
+          <textarea id="taskDesc" rows="3" placeholder="Describe the task..." class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition resize-none"></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="text-sm font-semibold text-gray-700 mb-1 block">Department</label>
+            <select id="taskDept" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition bg-white">
+              <option value="technical">Technical</option>
+              <option value="content">Content</option>
+              <option value="design">Design</option>
+              <option value="events">Events</option>
+              <option value="research">Research</option>
+              <option value="outreach">Outreach</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-sm font-semibold text-gray-700 mb-1 block">Priority</label>
+            <select id="taskPriority" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition bg-white">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="text-sm font-semibold text-gray-700 mb-1 block">Assign To</label>
+            <select id="taskAssignee" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition bg-white">
+            </select>
+          </div>
+          <div>
+            <label class="text-sm font-semibold text-gray-700 mb-1 block">Due Date</label>
+            <input id="taskDue" type="date" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition">
+          </div>
+        </div>
+        <div class="flex gap-3 pt-2">
+          <button type="button" onclick="closeModal()" class="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition">Cancel</button>
+          <button type="submit" class="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-cyan-600 text-white text-sm font-semibold hover:from-cyan-600 hover:to-cyan-700 shadow-lg shadow-cyan-200 transition">Create Task</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Task Detail Modal -->
+  <div id="detailModal" class="fixed inset-0 z-50 hidden items-center justify-center modal-overlay bg-black/30">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto fade-in">
+      <div class="p-6" id="detailContent"></div>
+    </div>
+  </div>
+
+  <!-- Profile Edit Modal -->
+  <div id="profileModal" class="fixed inset-0 z-50 hidden items-center justify-center modal-overlay bg-black/30">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto fade-in">
+      <div class="p-6 border-b border-gray-100 flex items-center justify-between">
+        <h3 class="text-lg font-bold text-gray-900">Edit Profile</h3>
+        <button onclick="closeProfileModal()" class="p-1 hover:bg-gray-100 rounded-lg transition">
+          <i data-lucide="x" class="w-5 h-5 text-gray-500"></i>
+        </button>
+      </div>
+      <form onsubmit="saveProfile(event)" class="p-6 space-y-4">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-sm font-semibold text-gray-700 mb-1 block">First Name</label>
+            <input id="profileFirstName" type="text" required class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition">
+          </div>
+          <div>
+            <label class="text-sm font-semibold text-gray-700 mb-1 block">Last Name</label>
+            <input id="profileLastName" type="text" required class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition">
+          </div>
+        </div>
+        <div>
+          <label class="text-sm font-semibold text-gray-700 mb-1 block">Email</label>
+          <input id="profileEmail" type="email" required class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition bg-gray-50" readonly>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-sm font-semibold text-gray-700 mb-1 block">Department</label>
+            <select id="profileDept" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none bg-white transition">
+              <option value="technical">Technical</option>
+              <option value="content">Content</option>
+              <option value="design">Design</option>
+              <option value="events">Events</option>
+              <option value="research">Research</option>
+              <option value="outreach">Outreach</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-sm font-semibold text-gray-700 mb-1 block">Role</label>
+            <input id="profileRole" type="text" required class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition">
+          </div>
+        </div>
+        <div class="border-t border-gray-100 pt-4 mt-2">
+          <p class="text-sm font-semibold text-gray-700 mb-3">Change Password</p>
+          <div class="space-y-3">
+            <div>
+              <label class="text-sm font-medium text-gray-600 mb-1 block">Current Password</label>
+              <input id="profileCurrentPwd" type="password" placeholder="Leave blank to keep current" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="text-sm font-medium text-gray-600 mb-1 block">New Password</label>
+                <input id="profileNewPwd" type="password" minlength="6" placeholder="Min 6 characters" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition">
+              </div>
+              <div>
+                <label class="text-sm font-medium text-gray-600 mb-1 block">Confirm Password</label>
+                <input id="profileConfirmPwd" type="password" minlength="6" placeholder="Repeat password" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="profileError" class="hidden text-sm text-rose-600 bg-rose-50 p-3 rounded-xl"></div>
+        <div id="profileSuccess" class="hidden text-sm text-emerald-600 bg-emerald-50 p-3 rounded-xl"></div>
+        <div class="flex gap-3 pt-2">
+          <button type="button" onclick="closeProfileModal()" class="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition">Cancel</button>
+          <button type="submit" class="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-cyan-600 text-white text-sm font-semibold hover:from-cyan-600 hover:to-cyan-700 shadow-lg shadow-cyan-200 transition">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="script.js"></script>
+<script src="https://deepsite.hf.co/deepsite-badge.js"></script>
+</body>
+</html>
